@@ -25,14 +25,34 @@ except Exception as e:
     print(f"MongoDB connection error: {str(e)}")
     traceback.print_exc()
 
+# Tambahkan di bagian atas file, setelah koneksi MongoDB berhasil
+def cleanup_old_files():
+    try:
+        # Hapus file yang lebih tua dari 1 jam
+        cutoff_time = datetime.utcnow() - timedelta(hours=1)
+        result = files_collection.delete_many({'created_at': {'$lt': cutoff_time}})
+        print(f"Cleaned up {result.deleted_count} old files")
+    except Exception as e:
+        print(f"Error during cleanup: {str(e)}")
+
+# Jalankan pembersihan saat aplikasi dimulai
+cleanup_old_files()
+
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.errorhandler(405)
+def method_not_allowed(e):
+    return render_template('405.html'), 405
 
 @app.route('/download', methods=['POST'])
 def download():
     try:
         url = request.form['url']
+        if not url.startswith(('https://www.youtube.com/', 'https://youtu.be/')):
+            raise ValueError('URL tidak valid. Harap masukkan URL YouTube yang valid.')
+        
         print(f"Processing URL: {url}")  # Debug log
         
         yt = YouTube(url)
@@ -72,9 +92,11 @@ def download():
         else:
             raise Exception("Buffer is empty")
 
+    except ValueError as e:
+        return str(e), 400
     except Exception as e:
         error_info = traceback.format_exc()
-        print(f"Error in download route: {str(e)}\n{error_info}")  # Debug log
+        print(f"Error in download route: {str(e)}\n{error_info}")
         return f"Terjadi kesalahan: {str(e)}", 500
 
 @app.route('/download_file/<file_id>')
