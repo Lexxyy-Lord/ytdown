@@ -16,13 +16,13 @@
             YouTube Downloader
         </h1>
         <div id="container">
-            <form action="/download" method="post" class="youtube-form">
-                <input type="text" id="url" name="url" required placeholder="Paste video URL here">
-                <select id="format" name="format">
-                    <option value="video">MP4 - Video</option>
-                    <option value="audio">MP3 - Audio</option>
+            <form action="/download" method="POST">
+                <input type="text" name="url" required>
+                <select name="format">
+                    <option value="video">Video</option>
+                    <option value="audio">Audio</option>
                 </select>
-                <button type="submit" class="download-btn">Download</button>
+                <button type="submit">Download</button>
             </form>
         </div>
     </main>

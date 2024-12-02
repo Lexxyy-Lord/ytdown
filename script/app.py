@@ -1,6 +1,6 @@
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_file, Response
 from pytube import YouTube
-import os
+import io
 
 app = Flask(__name__)
 
@@ -10,31 +10,33 @@ def index():
 
 @app.route('/download', methods=['POST'])
 def download():
-    url = request.form['url']
-    yt = YouTube(url)
-    
-    if request.form['format'] == 'video':
-        stream = yt.streams.get_highest_resolution()
-        filename = 'downloaded.mp4'
-    elif request.form['format'] == 'audio':
-        stream = yt.streams.filter(only_audio=True).first()
-        filename = 'downloaded.mp3'
+    try:
+        url = request.form['url']
+        yt = YouTube(url)
+        
+        if request.form['format'] == 'video':
+            stream = yt.streams.get_highest_resolution()
+            filename = f"{yt.title}.mp4"
+            mime_type = 'video/mp4'
+        else:
+            stream = yt.streams.filter(only_audio=True).first()
+            filename = f"{yt.title}.mp3"
+            mime_type = 'audio/mpeg'
 
-    output_path = os.path.join(os.getcwd(), 'downloads')
-    file_path = os.path.join(output_path, filename)
-    
-    stream.download(output_path=output_path, filename=filename)
-    
-    if os.path.exists(file_path):
-        return send_file(file_path, as_attachment=True)
-    else:
-        return "File tidak ditemukan", 404
+        # Download ke memory buffer
+        buffer = io.BytesIO()
+        stream.stream_to_buffer(buffer)
+        buffer.seek(0)
 
-@app.errorhandler(405)
-def method_not_allowed(e):
-    return render_template('405.html'), 405
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=filename,
+            mimetype=mime_type
+        )
+
+    except Exception as e:
+        return f"Terjadi kesalahan: {str(e)}", 500
 
 if __name__ == "__main__":
-    if not os.path.exists('downloads'):
-        os.makedirs('downloads')
     app.run(debug=True)
