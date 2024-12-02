@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file, Response, redirect, url_for
+from flask import Flask, render_template, request, send_file, Response, redirect, url_for, send_from_directory
 from pytube import YouTube
 import io
 import os
@@ -11,7 +11,9 @@ import sys
 
 load_dotenv()
 
-app = Flask(__name__)
+app = Flask(__name__,
+            template_folder='../',
+            static_folder='../')
 
 # Tambahkan error handling untuk koneksi MongoDB
 try:
@@ -128,6 +130,10 @@ def download_file(file_id):
         error_info = traceback.format_exc()
         print(f"Error in download_file route: {str(e)}\n{error_info}")  # Debug log
         return f"Terjadi kesalahan: {str(e)}", 500
+
+@app.route('/css/<path:filename>')
+def serve_css(filename):
+    return send_from_directory('../css', filename)
 
 if __name__ == "__main__":
     app.run(debug=True)
