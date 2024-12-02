@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file, Response, redirect, url_for, send_from_directory
+from flask import Flask, render_template, request, send_file, Response, redirect, url_for
 from pytube import YouTube
 import io
 import os
@@ -15,13 +15,17 @@ app = Flask(__name__,
             template_folder='../',
             static_folder='../')
 
-# Tambahkan error handling untuk koneksi MongoDB
+# Tambahkan variable untuk track status MongoDB
+mongodb_connected = False
+
+# Perbaiki koneksi MongoDB
 try:
-    client = MongoClient(os.getenv('MONGODB_URI'))
+    client = MongoClient(os.getenv('MONGODB_URI'), serverSelectionTimeoutMS=5000)
     # Test koneksi
     client.server_info()
     db = client['youtube_downloader']
     files_collection = db['temp_files']
+    mongodb_connected = True
     print("MongoDB connection successful")
 except Exception as e:
     print(f"MongoDB connection error: {str(e)}")
@@ -42,6 +46,8 @@ cleanup_old_files()
 
 @app.route('/')
 def index():
+    if not mongodb_connected:
+        return "Database connection error. Please try again later.", 500
     return render_template('index.html')
 
 @app.errorhandler(405)
@@ -50,8 +56,18 @@ def method_not_allowed(e):
 
 @app.route('/download', methods=['POST'])
 def download():
+    if not mongodb_connected:
+        return "Database connection error. Please try again later.", 500
+    
     try:
-        url = request.form['url']
+        url = request.form.get('url')
+        format_type = request.form.get('format')
+        
+        print(f"Received request - URL: {url}, Format: {format_type}")
+        
+        if not url:
+            raise ValueError('URL tidak boleh kosong')
+            
         if not url.startswith(('https://www.youtube.com/', 'https://youtu.be/')):
             raise ValueError('URL tidak valid. Harap masukkan URL YouTube yang valid.')
         
@@ -60,7 +76,7 @@ def download():
         yt = YouTube(url)
         print(f"YouTube object created for: {yt.title}")  # Debug log
         
-        if request.form['format'] == 'video':
+        if format_type == 'video':
             stream = yt.streams.get_highest_resolution()
             filename = f"video_{datetime.now().timestamp()}.mp4"
             mime_type = 'video/mp4'
@@ -97,8 +113,8 @@ def download():
     except ValueError as e:
         return str(e), 400
     except Exception as e:
-        error_info = traceback.format_exc()
-        print(f"Error in download route: {str(e)}\n{error_info}")
+        print(f"Error in download route: {str(e)}")
+        print(f"Full traceback: {traceback.format_exc()}")
         return f"Terjadi kesalahan: {str(e)}", 500
 
 @app.route('/download_file/<file_id>')
@@ -130,10 +146,6 @@ def download_file(file_id):
         error_info = traceback.format_exc()
         print(f"Error in download_file route: {str(e)}\n{error_info}")  # Debug log
         return f"Terjadi kesalahan: {str(e)}", 500
-
-@app.route('/css/<path:filename>')
-def serve_css(filename):
-    return send_from_directory('../css', filename)
 
 if __name__ == "__main__":
     app.run(debug=True)
